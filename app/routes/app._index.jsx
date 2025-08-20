@@ -129,31 +129,11 @@ const MetricsIcon = () => (
     <path d="M24 24V12" stroke="#4F6E57" strokeWidth="2" strokeLinecap="round" />
   </svg>
 );
-async function fetchThemes(shop, accessToken) {
-  try {
-    const response = await fetch(`https://${shop}/admin/api/2023-07/themes.json`, {
-      headers: {
-        "X-Shopify-Access-Token": accessToken, // ✅ Use session token, not env var
-        "Content-Type": "application/json",
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch themes: ${response.status} ${response.statusText}`);
-    }
-    const data = await response.json();
-    return data.themes || [];
-  } catch (error) {
-    console.error("Error fetching themes:", error);
-    throw new Response("Failed to fetch themes", { status: 500 });
-  }
-}
-
-
 export async function loader({ request }) {
   const { session } = await authenticate.admin(request);
   const { shop,accessToken } = session;
 
-  const themesData = await fetchThemes(shop);
+  const themesData = await fetchThemes(shop, accessToken);
   const publishedTheme = themesData.find((theme) => theme.role === "main") || {};
 
   let setting = await db.setting.findUnique({ where: { id: "global-setting" } });
@@ -200,6 +180,27 @@ export async function loader({ request }) {
     publishedThemeId: publishedTheme.id || null,
   });
 }
+
+async function fetchThemes(shop, accessToken) {
+  try {
+    const response = await fetch(`https://${shop}/admin/api/2023-07/themes.json`, {
+      headers: {
+        "X-Shopify-Access-Token": accessToken, // ✅ Use session token, not env var
+        "Content-Type": "application/json",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch themes: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.themes || [];
+  } catch (error) {
+    console.error("Error fetching themes:", error);
+    throw new Response("Failed to fetch themes", { status: 500 });
+  }
+}
+
+
 
 
 export default function Dashboard() {
