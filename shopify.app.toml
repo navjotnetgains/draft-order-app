@@ -3,7 +3,7 @@
 client_id = "9fd275d862c675142a61cf6f07aff2dc"
 name = "Draft Order App"
 handle = "draft-orders-app-4"
-application_url = "https://title-failure-bufing-portrait.trycloudflare.com"
+application_url = "https://shirt-reactions-polished-implemented.trycloudflare.com"
 embedded = true
 
 [build]
@@ -26,7 +26,7 @@ api_version = "2025-07"
 scopes = "write_products,read_themes,write_draft_orders"
 
 [auth]
-redirect_urls = ["https://title-failure-bufing-portrait.trycloudflare.com/auth/callback", "https://title-failure-bufing-portrait.trycloudflare.com/auth/shopify/callback", "https://title-failure-bufing-portrait.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://shirt-reactions-polished-implemented.trycloudflare.com/auth/callback", "https://shirt-reactions-polished-implemented.trycloudflare.com/auth/shopify/callback", "https://shirt-reactions-polished-implemented.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false
