@@ -173,8 +173,8 @@ return draftOrder;
   port: 465,
   secure: true,
   auth: {
-    user: "navjot@netgains.org",
-    pass: "spxr dbib cuxh munp" // your Google app password
+    user:process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS // your Google app password
   }
 });
 let summaryHTML = "";

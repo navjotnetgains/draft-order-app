@@ -9,8 +9,9 @@ generator client {
 // enough when changing adapters.
 // See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")   
+  
 }
 
 model Session {
@@ -44,12 +45,3 @@ model Setting {
 }
 
 
-model subscription {
-  id                  String   @id @default(cuid())
-  shop                String   @unique
-  plan                String?
-  status              String   @default("INACTIVE") // PENDING / ACTIVE / CANCELLED / UNINSTALLED
-  remoteSubscriptionId String? 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-}
