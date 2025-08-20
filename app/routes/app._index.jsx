@@ -129,11 +129,11 @@ const MetricsIcon = () => (
     <path d="M24 24V12" stroke="#4F6E57" strokeWidth="2" strokeLinecap="round" />
   </svg>
 );
-async function fetchThemes(shop) {
+async function fetchThemes(shop, accessToken) {
   try {
     const response = await fetch(`https://${shop}/admin/api/2023-07/themes.json`, {
       headers: {
-        "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN,
+        "X-Shopify-Access-Token": accessToken, // ✅ Use session token, not env var
         "Content-Type": "application/json",
       },
     });
@@ -148,9 +148,10 @@ async function fetchThemes(shop) {
   }
 }
 
+
 export async function loader({ request }) {
   const { session } = await authenticate.admin(request);
-  const { shop } = session;
+  const { shop,accessToken } = session;
 
   const themesData = await fetchThemes(shop);
   const publishedTheme = themesData.find((theme) => theme.role === "main") || {};
