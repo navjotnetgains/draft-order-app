@@ -22,6 +22,7 @@ CREATE TABLE "public"."Session" (
 -- CreateTable
 CREATE TABLE "public"."Setting" (
     "id" TEXT NOT NULL,
+    "shop" TEXT NOT NULL,
     "doubleDraftOrdersEnabled" BOOLEAN NOT NULL,
     "discount1" DOUBLE PRECISION,
     "discount2" DOUBLE PRECISION,
@@ -32,3 +33,6 @@ CREATE TABLE "public"."Setting" (
 
     CONSTRAINT "Setting_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Setting_shop_key" ON "public"."Setting"("shop");

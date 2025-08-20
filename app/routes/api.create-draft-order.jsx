@@ -5,7 +5,7 @@ import nodemailer from "nodemailer";
 
 export async function action({ request }) {
   try {
-    const { customer, cart, address, billingAddress, useShipping } = await request.json();
+    const {shop, customer, cart, address, billingAddress, useShipping } = await request.json();
     if (!customer?.email) throw new Error("Missing customer email");
 
     const adminGraphQLEndpoint = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/graphql.json`;
@@ -15,7 +15,11 @@ export async function action({ request }) {
     };
 
     // Load settings
-    const setting = await db.setting.findUnique({ where: { id: "global-setting" } });
+  const setting = await db.setting.findUnique({ where: { shop } });
+
+if (!setting) {
+  throw new Error("Settings not found for this shop");
+}
 
     // Find customer in Shopify
     const customerQuery = `

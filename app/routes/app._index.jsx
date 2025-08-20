@@ -131,20 +131,22 @@ const MetricsIcon = () => (
 );
 export async function loader({ request }) {
   const { session } = await authenticate.admin(request);
-  const { shop,accessToken } = session;
+  const { shop, accessToken } = session;
 
+  // Fetch themes
   const themesData = await fetchThemes(shop, accessToken);
   const publishedTheme = themesData.find((theme) => theme.role === "main") || {};
 
-  let setting = await db.setting.findUnique({ where: { id: "global-setting" } });
+  // Fetch or create settings for this shop
+  let setting = await db.setting.findUnique({ where: { shop } });
   if (!setting) {
     setting = await db.setting.create({
       data: {
-        id: "global-setting",
+        shop,
         doubleDraftOrdersEnabled: false,
-        discount1: null,
-        discount2: null,
-        singleDiscount: null,
+        discount1: 0,
+        discount2: 0,
+        singleDiscount: 0,
         tag1: "",
         tag2: "",
         singleTag: "",
@@ -185,13 +187,11 @@ async function fetchThemes(shop, accessToken) {
   try {
     const response = await fetch(`https://${shop}/admin/api/2023-07/themes.json`, {
       headers: {
-        "X-Shopify-Access-Token": accessToken, // ✅ Use session token, not env var
+        "X-Shopify-Access-Token": accessToken, // Use session token
         "Content-Type": "application/json",
       },
     });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch themes: ${response.status} ${response.statusText}`);
-    }
+    if (!response.ok) throw new Error(`Failed to fetch themes: ${response.status}`);
     const data = await response.json();
     return data.themes || [];
   } catch (error) {
@@ -199,6 +199,8 @@ async function fetchThemes(shop, accessToken) {
     throw new Response("Failed to fetch themes", { status: 500 });
   }
 }
+
+
 
 
 

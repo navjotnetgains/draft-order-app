@@ -1,18 +1,32 @@
 import { useFetcher, useLoaderData } from "@remix-run/react";
-import db from "../db.server";
 import { json } from "@remix-run/node";
+
 import { useEffect, useState } from "react";
+import { nanoid } from "nanoid";
+import db from "../db.server";
+import { authenticate } from "../shopify.server";
 
 /* ======================= */
 /*        LOADER           */
 /* ======================= */
-export async function loader() {
-  let setting = await db.setting.findUnique({ where: { id: "global-setting" } });
+
+export async function loader({ request }) {
+  // Get shop from authenticated session
+  const { session } = await authenticate.admin(request);
+  const { shop } = session;
+
+  if (!shop) {
+    throw new Error("No shop found in session");
+  }
+
+  // Find or create shop setting
+  let setting = await db.setting.findUnique({ where: { shop } });
 
   if (!setting) {
     setting = await db.setting.create({
       data: {
-        id: "global-setting",
+        id: nanoid(),
+        shop,
         doubleDraftOrdersEnabled: false,
         discount1: 0,
         discount2: 0,
@@ -24,14 +38,18 @@ export async function loader() {
     });
   }
 
-  return json({ setting });
+  return json({ setting, shop });
 }
+
 
 /* ======================= */
 /*        ACTION           */
 /* ======================= */
 export async function action({ request }) {
   const formData = await request.formData();
+  const shop = formData.get("shop");
+  if (!shop) throw new Error("Missing shop in form data");
+
   const doubleEnabled = formData.get("enabled") === "true";
 
   const data = {
@@ -44,7 +62,7 @@ export async function action({ request }) {
     singleTag: doubleEnabled ? "" : String(formData.get("singleTag") || ""),
   };
 
-  await db.setting.update({ where: { id: "global-setting" }, data });
+  await db.setting.update({ where: { shop }, data });
 
   return json({ success: true });
 }
@@ -53,13 +71,10 @@ export async function action({ request }) {
 /*       COMPONENT         */
 /* ======================= */
 export default function Settings() {
-  const { setting } = useLoaderData();
+  const { setting, shop } = useLoaderData();
   const fetcher = useFetcher();
 
-  // View/Edit mode
   const [editing, setEditing] = useState(false);
-
-  // Controlled state seeded from DB
   const [isEnabled, setIsEnabled] = useState(setting.doubleDraftOrdersEnabled);
   const [discount1, setDiscount1] = useState(setting.discount1 ?? 0);
   const [tag1, setTag1] = useState(setting.tag1 || "");
@@ -69,7 +84,6 @@ export default function Settings() {
   const [singleTag, setSingleTag] = useState(setting.singleTag || "");
   const [justSaved, setJustSaved] = useState(false);
 
-  // After a successful save, lock back and show success
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.success) {
       setEditing(false);
@@ -77,7 +91,6 @@ export default function Settings() {
     }
   }, [fetcher.state, fetcher.data]);
 
-  // If the server value changes (after revalidation), sync local fields when not editing
   useEffect(() => {
     if (!editing) {
       setIsEnabled(setting.doubleDraftOrdersEnabled);
@@ -92,7 +105,6 @@ export default function Settings() {
 
   const onCancel = () => {
     setEditing(false);
-    // restore from current DB snapshot
     setIsEnabled(setting.doubleDraftOrdersEnabled);
     setDiscount1(setting.discount1 ?? 0);
     setTag1(setting.tag1 || "");
@@ -104,6 +116,7 @@ export default function Settings() {
 
   const onSave = () => {
     const fd = new FormData();
+    fd.append("shop", shop);
     fd.append("enabled", String(isEnabled));
 
     if (isEnabled) {
@@ -153,9 +166,9 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Toggle */}
       <Row label="Allow Double Draft Orders">
         <label style={{ position: "relative", width: 50, height: 28 }}>
+          <input type="hidden" name="shop" value={shop} />
           <input
             type="checkbox"
             checked={isEnabled}
@@ -188,7 +201,6 @@ export default function Settings() {
         </label>
       </Row>
 
-      {/* Fields */}
       {isEnabled ? (
         <>
           <Field
@@ -226,7 +238,6 @@ export default function Settings() {
         </>
       )}
 
-      {/* Buttons */}
       <div style={{ marginTop: 20, display: "flex", gap: 12 }}>
         {editing ? (
           <>

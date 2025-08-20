@@ -32,16 +32,17 @@ model Session {
   emailVerified Boolean?  @default(false)
 }
 
-
 model Setting {
-  id                      String   @id
-  doubleDraftOrdersEnabled Boolean
-  discount1               Float?
-  discount2               Float?
-  singleDiscount          Float?
-  tag1                    String?
-  tag2                    String?
-  singleTag               String?
+  id                        String   @id @default(uuid())
+  shop                      String   @unique
+  doubleDraftOrdersEnabled  Boolean
+  discount1                 Float?
+  discount2                 Float?
+  singleDiscount            Float?
+  tag1                      String?
+  tag2                      String?
+  singleTag                 String?
 }
+
 
 
