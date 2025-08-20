@@ -1,0 +1,12 @@
+name = "theme-extension"
+type = "theme"
+
+[extension]
+type = "app"
+name = "Draft Order Embed"
+targets = ["app_embeds"]
+
+[[extension.app_embeds]]
+name = "Draft Order App Embed"
+enablement = { type = "app_embeds" }
+enabled_on = { templates = ["cart"], snippets = ["cart-notification-button"] }
