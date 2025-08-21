@@ -33,16 +33,12 @@ model Session {
 }
 
 model Setting {
-  id                        String   @id @default(uuid())
-  shop                      String   @unique
-  doubleDraftOrdersEnabled  Boolean
-  discount1                 Float?
-  discount2                 Float?
-  singleDiscount            Float?
-  tag1                      String?
-  tag2                      String?
-  singleTag                 String?
+  shop                      String   @id   // each shop is uniquely identified
+  doubleDraftOrdersEnabled  Boolean  @default(false)
+  discount1                 Float?   @default(0)
+  discount2                 Float?   @default(0)
+  tag1                      String?  @default("")
+  tag2                      String?  @default("")
+  singleDiscount            Float?   @default(0)
+  singleTag                 String?  @default("")
 }
-
-
-

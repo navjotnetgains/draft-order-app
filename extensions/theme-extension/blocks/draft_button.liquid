@@ -301,8 +301,7 @@
       if (errorEl) errorEl.textContent = '';
     });
   }
-
-  function initializeDraftOrder() {
+function initializeDraftOrder() {
     const modal = document.getElementById('modal-overlay');
     const closeBtn = document.getElementById('close-modal');
     const submitBtn = document.getElementById('submit-address');
@@ -325,6 +324,28 @@
       }
       
       modal.style.display = 'flex';
+    }
+    
+    // Get shop domain from Shopify global object or URL
+    function getShopDomain() {
+      // Try different methods to get the shop domain
+      if (window.Shopify && window.Shopify.shop) {
+        return window.Shopify.shop;
+      }
+      
+      // Check for shop parameter in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('shop')) {
+        return urlParams.get('shop');
+      }
+      
+      // Extract from current hostname if it's a myshopify.com domain
+      if (window.location.hostname.includes('.myshopify.com')) {
+        return window.location.hostname;
+      }
+      
+      // Fallback: use the hostname (may not work for custom domains)
+      return window.location.hostname;
     }
     
     // Set up main cart button
@@ -398,9 +419,16 @@
       });
     }
     
-    // Submit handler remains the same
+    // Submit handler with shop parameter
     if (submitBtn) {
       submitBtn.addEventListener('click', async () => {
+        // Get shop domain
+        const shop = getShopDomain();
+        if (!shop) {
+          showToast("Unable to determine shop domain.");
+          return;
+        }
+        
         // List required fields (billing fields added conditionally)
         const requiredFields = [
           { id: 'country', name: 'Country' },
@@ -476,10 +504,18 @@
         const discount = cart.discount_codes?.[0] || null;
 
         try {
-          const response = await fetch("https://draft-order-app-seven.vercel.app/api/create-draft-order", {
+          const response = await fetch(`https://draft-order-app-seven.vercel.app/api/create-draft-order`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ customer, cart, address, discount, billingAddress, useShipping })
+            body: JSON.stringify({ 
+              customer, 
+              cart, 
+              address, 
+              discount, 
+              billingAddress, 
+              useShipping,
+              shop // Add shop parameter here
+            })
           });
 
           const result = await response.json();

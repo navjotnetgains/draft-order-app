@@ -2,25 +2,36 @@ import { json } from "@remix-run/node";
 import { cors } from "remix-utils/cors";
 import db from "../db.server";
 import nodemailer from "nodemailer";
+import { authenticate } from "../shopify.server";
 
 export async function action({ request }) {
   try {
-    const {shop, customer, cart, address, billingAddress, useShipping } = await request.json();
-    if (!customer?.email) throw new Error("Missing customer email");
+    // Authenticate the request
+     const body = await request.json();
+    const { customer, cart, address, billingAddress, useShipping, shop } = body;
+    
+    console.log("Shop from frontend:", shop);
+    
+    if (!shop) {
+      throw new Error("Shop parameter is required");
+    }
 
-    const adminGraphQLEndpoint = `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/graphql.json`;
+    if (!customer?.email) {
+      throw new Error("Missing customer email");
+    }
+
+    // Use the shop from the frontend for the GraphQL endpoint
+    const adminGraphQLEndpoint = `https://${shop}/admin/api/2024-01/graphql.json`;
     const headers = {
       "Content-Type": "application/json",
       "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN,
     };
 
     // Load settings
-  const setting = await db.setting.findUnique({ where: { shop } });
-
-if (!setting) {
-  throw new Error("Settings not found for this shop");
-}
-
+    const setting = await db.setting.findUnique({ where: { shop } });
+    if (!setting) {
+      throw new Error("Settings not found for this shop");
+    }
     // Find customer in Shopify
     const customerQuery = `
       query getCustomerByEmail($email: String!) {
@@ -90,26 +101,25 @@ if (!setting) {
             createdAt
             totalPriceSet { shopMoney { amount currencyCode } }
             lineItems(first: 250) {
-  edges {
-    node {
-      title
-      quantity
-      variant {
-        title
-        image {
-          originalSrc
-        }
-      }
-      originalUnitPriceSet {
-        shopMoney {
-          amount
-          currencyCode
-        }
-      }
-    }
-  }
-}
-
+              edges {
+                node {
+                  title
+                  quantity
+                  variant {
+                    title
+                    image {
+                      originalSrc
+                    }
+                  }
+                  originalUnitPriceSet {
+                    shopMoney {
+                      amount
+                      currencyCode
+                    }
+                  }
+                }
+              }
+            }
           }
           userErrors {
             field
@@ -153,11 +163,9 @@ if (!setting) {
       if (data.errors) throw new Error("GraphQL Errors: " + JSON.stringify(data.errors));
       const userErrors = data?.data?.draftOrderCreate?.userErrors || [];
       if (userErrors.length) throw new Error(userErrors.map(e => e.message).join(", "));
-   const draftOrder = data.data.draftOrderCreate.draftOrder;
-console.log("Shopify returned line items:", JSON.stringify(draftOrder.lineItems, null, 2));
-return draftOrder;
-
-      
+      const draftOrder = data.data.draftOrderCreate.draftOrder;
+      console.log("Shopify returned line items:", JSON.stringify(draftOrder.lineItems, null, 2));
+      return draftOrder;
     };
 
     // Create orders
@@ -173,93 +181,85 @@ return draftOrder;
 
     // ---- SEND CUSTOM CONFIRMATION EMAIL ----
     let transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user:process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS // your Google app password
-  }
-});
-let summaryHTML = "";
-if (createdOrders.length > 0) {
-  const firstOrder = createdOrders[0];
-  let grandTotal = 0;
-
-  summaryHTML += `
-    <div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif;color:#333;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden;">
-      
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
     
+    let summaryHTML = "";
+    if (createdOrders.length > 0) {
+      const firstOrder = createdOrders[0];
+      let grandTotal = 0;
 
-      <!-- Greeting -->
-      <div style="padding:20px;">
-        <h2 style="margin-top:0;color:#111;">Hello ${customer.first_name}, your order is saved in draft orders</h2>
-        <p>Good news! We’ve saved your order as a draft. You can review it now, and we’ll be in touch shortly to finalize everything.</p>
+      summaryHTML += `
+        <div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif;color:#333;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden;">
+          
+          <!-- Greeting -->
+          <div style="padding:20px;">
+            <h2 style="margin-top:0;color:#111;">Hello ${customer.first_name}, your order is saved in draft orders</h2>
+            <p>Good news! We've saved your order as a draft. You can review it now, and we'll be in touch shortly to finalize everything.</p>
+          </div>
+          
+          <!-- Items -->
+          <div style="border-top:1px solid #e5e5e5;padding:20px;">
+            <h3 style="margin-top:0;color:#111;">Order Summary</h3>
+      `;
+
+      firstOrder.lineItems.edges.forEach(({ node }) => {
+        const price = parseFloat(node.originalUnitPriceSet.shopMoney.amount);
+        const total = price * node.quantity;
+        grandTotal += total;
+        const currency = node.originalUnitPriceSet.shopMoney.currencyCode;
+        const variantTitle = node.variant?.title && node.variant.title !== "Default Title"
+          ? ` - ${node.variant.title}`
+          : "";
+        const imageUrl = node.variant?.image?.originalSrc || "https://via.placeholder.com/60";
+
+        summaryHTML += `
+          <div style="padding:10px 0; width:full;border-bottom:1px solid #e5e5e5;display:flex;align-items:center;justify-content:space-between;gap:15px;">
+            
+            <!-- Left: Image -->
+            <img src="${imageUrl}" alt="${node.title}" width="50" height="50"
+                 style="border-radius:4px;border:1px solid #ddd;object-fit:cover;flex-shrink:0;">
+            
+            <!-- Middle: Title + Qty -->
+            <div style="flex:1;padding:0px 40px;">
+              <div style="font-size:14px;font-color:gray;font-weight:500;color:#333;line-height:1.4;word-wrap:break-word;overflow-wrap:break-word;white-space:normal;">
+                ${node.title}${variantTitle}
+              </div>
+              <div style="font-size:13px;color:#666;margin-top:2px;">
+                × ${node.quantity}
+              </div>
+            </div>
+            
+            <!-- Right: Price -->
+            <div style="font-size:14px;font-weight:500;color:#333;white-space:nowrap;">
+              ${currency} ${total.toFixed(2)}
+            </div>
+          </div>
+        `;
+      });
+
+      // Total
+      summaryHTML += `
+        </div>
+        <div style="padding:20px;border-top:1px solid #333;display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:16px;">
+          <span style="flex:1;text-align:left;">Total</span>
+          <span style="text-align:right;">${firstOrder.lineItems.edges[0]?.node.originalUnitPriceSet.shopMoney.currencyCode} ${grandTotal.toFixed(2)}</span>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color:#f8f8f8;padding:15px;text-align:center;font-size:12px;color:#777;">
+          <p>Need help? Contact us at <a href="mailto:support@yourstore.com" style="color:#008060;">support@yourstore.com</a></p>
+          <p>&copy; ${new Date().getFullYear()} Your Store. All rights reserved.</p>
+        </div>
       </div>
-
-      
-      <!-- Items -->
-      <div style="border-top:1px solid #e5e5e5;padding:20px;">
-        <h3 style="margin-top:0;color:#111;">Order Summary</h3>
-  `;
-
-  firstOrder.lineItems.edges.forEach(({ node }) => {
-    const price = parseFloat(node.originalUnitPriceSet.shopMoney.amount);
-    const total = price * node.quantity;
-    grandTotal += total;
-    const currency = node.originalUnitPriceSet.shopMoney.currencyCode;
-    const variantTitle = node.variant?.title && node.variant.title !== "Default Title"
-      ? ` - ${node.variant.title}`
-      : "";
-    const imageUrl = node.variant?.image?.originalSrc || "https://via.placeholder.com/60";
-
-summaryHTML += `
-  <div style="padding:10px 0; width:full;border-bottom:1px solid #e5e5e5;display:flex;align-items:center;justify-content:space-between;gap:15px;">
-    
-    <!-- Left: Image -->
-    <img src="${imageUrl}" alt="${node.title}" width="50" height="50"
-         style="border-radius:4px;border:1px solid #ddd;object-fit:cover;flex-shrink:0;">
-    
-    <!-- Middle: Title + Qty -->
-    <div style="flex:1;padding:0px 40px;">
-      <div style="font-size:14px;font-color:gray;font-weight:500;color:#333;line-height:1.4;word-wrap:break-word;overflow-wrap:break-word;white-space:normal;">
-        ${node.title}${variantTitle}
-      </div>
-      <div style="font-size:13px;color:#666;margin-top:2px;">
-        × ${node.quantity}
-      </div>
-    </div>
-    
-    <!-- Right: Price -->
-    <div style="font-size:14px;font-weight:500;color:#333;white-space:nowrap;">
-      ${currency} ${total.toFixed(2)}
-    </div>
-  </div>
-`;
-
-
-
-
-  });
-
-  // Total
- // Total
-summaryHTML += `
-  </div>
-  <div style="padding:20px;border-top:1px solid #333;display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:16px;">
-    <span style="flex:1;text-align:left;">Total</span>
-    <span style="text-align:right;">${firstOrder.lineItems.edges[0]?.node.originalUnitPriceSet.shopMoney.currencyCode} ${grandTotal.toFixed(2)}</span>
-  </div>
-
-
-      <!-- Footer -->
-      <div style="background-color:#f8f8f8;padding:15px;text-align:center;font-size:12px;color:#777;">
-        <p>Need help? Contact us at <a href="mailto:support@yourstore.com" style="color:#008060;">support@yourstore.com</a></p>
-        <p>&copy; ${new Date().getFullYear()} Your Store. All rights reserved.</p>
-      </div>
-    </div>
-  `;
-}
+      `;
+    }
 
     await transporter.sendMail({
       from: `"Your Store" <${process.env.SMTP_USER}>`,
