@@ -1,17 +1,10 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")   
-  
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Session {
@@ -33,12 +26,12 @@ model Session {
 }
 
 model Setting {
-  shop                      String   @id   // each shop is uniquely identified
-  doubleDraftOrdersEnabled  Boolean  @default(false)
-  discount1                 Float?   @default(0)
-  discount2                 Float?   @default(0)
-  tag1                      String?  @default("")
-  tag2                      String?  @default("")
-  singleDiscount            Float?   @default(0)
-  singleTag                 String?  @default("")
+  shop                     String  @id
+  doubleDraftOrdersEnabled Boolean @default(false)
+  discount1                Float?  @default(0)
+  discount2                Float?  @default(0)
+  tag1                     String? @default("")
+  tag2                     String? @default("")
+  singleDiscount           Float?  @default(0)
+  singleTag                String? @default("")
 }

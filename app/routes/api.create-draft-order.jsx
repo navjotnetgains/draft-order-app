@@ -2,7 +2,7 @@ import { json } from "@remix-run/node";
 import { cors } from "remix-utils/cors";
 import db from "../db.server";
 import nodemailer from "nodemailer";
-import { authenticate } from "../shopify.server";
+
 
 export async function action({ request }) {
   try {
