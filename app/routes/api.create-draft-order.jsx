@@ -24,7 +24,7 @@ export async function action({ request }) {
     const adminGraphQLEndpoint = `https://${shop}/admin/api/2024-01/graphql.json`;
     const headers = {
       "Content-Type": "application/json",
-      "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN,
+      "X-Shopify-Access-Token": setting.accessToken,
     };
 
     // Load settings
