@@ -3,7 +3,7 @@
 client_id = "9fd275d862c675142a61cf6f07aff2dc"
 name = "Draft Order App"
 handle = "draft-orders-app-4"
-application_url = "https://profits-wisconsin-laptop-rankings.trycloudflare.com"
+application_url = "https://montgomery-ir-proxy-refused.trycloudflare.com"
 embedded = true
 
 [build]
@@ -26,7 +26,7 @@ api_version = "2025-07"
 scopes = "read_themes,write_draft_orders,write_products"
 
 [auth]
-redirect_urls = ["https://profits-wisconsin-laptop-rankings.trycloudflare.com/auth/callback", "https://profits-wisconsin-laptop-rankings.trycloudflare.com/auth/shopify/callback", "https://profits-wisconsin-laptop-rankings.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://montgomery-ir-proxy-refused.trycloudflare.com/auth/callback", "https://montgomery-ir-proxy-refused.trycloudflare.com/auth/shopify/callback", "https://montgomery-ir-proxy-refused.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

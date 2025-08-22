@@ -2,10 +2,19 @@ import { json } from "@remix-run/node";
 import { cors } from "remix-utils/cors";
 import db from "../db.server";
 import nodemailer from "nodemailer";
+import { authenticate } from "../shopify.server";
 
 
 export async function action({ request }) {
+
   try {
+       const { session } = await authenticate.admin(request);
+
+    const accessToken = session.accessToken;
+    
+
+
+    console.log("Access Token:", accessToken);
     // Authenticate the request
      const body = await request.json();
     const { customer, cart, address, billingAddress, useShipping, shop } = body;
@@ -24,7 +33,7 @@ export async function action({ request }) {
     const adminGraphQLEndpoint = `https://${shop}/admin/api/2024-01/graphql.json`;
     const headers = {
       "Content-Type": "application/json",
-      "X-Shopify-Access-Token": setting.accessToken,
+      "X-Shopify-Access-Token":accessToken,
     };
 
     // Load settings
