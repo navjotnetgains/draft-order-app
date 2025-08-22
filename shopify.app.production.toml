@@ -1,0 +1,34 @@
+
+client_id = "9fd275d862c675142a61cf6f07aff2dc"
+name = "Draft Order App"
+handle = "draft-orders-app-4"
+application_url = "https://draft-order-app-seven.vercel.app"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-07"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+[access_scopes]
+scopes = "read_themes,write_draft_orders,write_products"
+
+[auth]
+redirect_urls = [
+  "https://draft-order-app-seven.vercel.app/auth/callback",
+  "https://draft-order-app-seven.vercel.app/auth/shopify/callback",
+  "https://draft-order-app-seven.vercel.app/api/auth/callback"
+]
+
+[pos]
+embedded = false

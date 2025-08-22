@@ -1,7 +1,9 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
 client_id = "9fd275d862c675142a61cf6f07aff2dc"
 name = "Draft Order App"
 handle = "draft-orders-app-4"
-application_url = "https://draft-order-app-seven.vercel.app"
+application_url = "https://bruce-sends-cw-catch.trycloudflare.com"
 embedded = true
 
 [build]
@@ -20,14 +22,11 @@ api_version = "2025-07"
   uri = "/webhooks/app/uninstalled"
 
 [access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_themes,write_draft_orders,write_products"
 
 [auth]
-redirect_urls = [
-  "https://draft-order-app-seven.vercel.app/auth/callback",
-  "https://draft-order-app-seven.vercel.app/auth/shopify/callback",
-  "https://draft-order-app-seven.vercel.app/api/auth/callback"
-]
+redirect_urls = ["https://bruce-sends-cw-catch.trycloudflare.com/auth/callback", "https://bruce-sends-cw-catch.trycloudflare.com/auth/shopify/callback", "https://bruce-sends-cw-catch.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

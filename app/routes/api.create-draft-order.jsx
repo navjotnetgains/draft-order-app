@@ -29,6 +29,7 @@ export async function action({ request }) {
 
     // Load settings
     const setting = await db.setting.findUnique({ where: { shop } });
+    console.log(setting)
     if (!setting) {
       throw new Error("Settings not found for this shop");
     }
