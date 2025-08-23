@@ -504,7 +504,7 @@ function initializeDraftOrder() {
         const discount = cart.discount_codes?.[0] || null;
 
         try {
-          const response = await fetch(`https://draft-order-app-seven.vercel.app/api/create-draft-order`, {
+          const response = await fetch(`https://brokers-subscribe-rec-aims.trycloudflare.com/api/create-draft-order`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
@@ -514,7 +514,7 @@ function initializeDraftOrder() {
               discount, 
               billingAddress, 
               useShipping,
-              shop // Add shop parameter here
+             shop
             })
           });
 

@@ -3,7 +3,7 @@
 client_id = "9fd275d862c675142a61cf6f07aff2dc"
 name = "Draft Order App"
 handle = "draft-orders-app-4"
-application_url = "https://montgomery-ir-proxy-refused.trycloudflare.com"
+application_url = "https://brokers-subscribe-rec-aims.trycloudflare.com"
 embedded = true
 
 [build]
@@ -23,10 +23,10 @@ api_version = "2025-07"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_themes,write_draft_orders,write_products"
+scopes = "read_themes,read_draft_orders,write_products,read_products,read_customers,write_draft_orders,write_customers"
 
 [auth]
-redirect_urls = ["https://montgomery-ir-proxy-refused.trycloudflare.com/auth/callback", "https://montgomery-ir-proxy-refused.trycloudflare.com/auth/shopify/callback", "https://montgomery-ir-proxy-refused.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://brokers-subscribe-rec-aims.trycloudflare.com/auth/callback", "https://brokers-subscribe-rec-aims.trycloudflare.com/auth/shopify/callback", "https://brokers-subscribe-rec-aims.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false
