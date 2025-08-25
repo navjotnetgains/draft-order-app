@@ -3,7 +3,7 @@
 client_id = "9fd275d862c675142a61cf6f07aff2dc"
 name = "Draft Order App"
 handle = "draft-orders-app-4"
-application_url = "https://jerry-homework-alcohol-duplicate.trycloudflare.com"
+application_url = "https://delays-printed-ready-douglas.trycloudflare.com"
 embedded = true
 
 [build]
@@ -27,7 +27,7 @@ api_version = "2025-07"
 scopes = "read_themes,read_draft_orders,write_products,read_products,read_customers,write_draft_orders,write_customers"
 
 [auth]
-redirect_urls = ["https://jerry-homework-alcohol-duplicate.trycloudflare.com/auth/callback", "https://jerry-homework-alcohol-duplicate.trycloudflare.com/auth/shopify/callback", "https://jerry-homework-alcohol-duplicate.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://delays-printed-ready-douglas.trycloudflare.com/auth/callback", "https://delays-printed-ready-douglas.trycloudflare.com/auth/shopify/callback", "https://delays-printed-ready-douglas.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false
