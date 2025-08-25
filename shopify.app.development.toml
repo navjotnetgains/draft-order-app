@@ -3,12 +3,13 @@
 client_id = "9fd275d862c675142a61cf6f07aff2dc"
 name = "Draft Order App"
 handle = "draft-orders-app-4"
-application_url = "https://brokers-subscribe-rec-aims.trycloudflare.com"
+application_url = "https://jerry-homework-alcohol-duplicate.trycloudflare.com"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
 include_config_on_deploy = true
+
 
 [webhooks]
 api_version = "2025-07"
@@ -26,7 +27,7 @@ api_version = "2025-07"
 scopes = "read_themes,read_draft_orders,write_products,read_products,read_customers,write_draft_orders,write_customers"
 
 [auth]
-redirect_urls = ["https://brokers-subscribe-rec-aims.trycloudflare.com/auth/callback", "https://brokers-subscribe-rec-aims.trycloudflare.com/auth/shopify/callback", "https://brokers-subscribe-rec-aims.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://jerry-homework-alcohol-duplicate.trycloudflare.com/auth/callback", "https://jerry-homework-alcohol-duplicate.trycloudflare.com/auth/shopify/callback", "https://jerry-homework-alcohol-duplicate.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false
