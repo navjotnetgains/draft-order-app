@@ -152,7 +152,7 @@ export async function loader({ request }) {
   const adminGraphQLEndpoint = `https://${shop}/admin/api/2025-07/graphql.json`;
   const headers = {
     "Content-Type": "application/json",
-    "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN,
+    "X-Shopify-Access-Token": accessToken,
   };
   const draftOrdersQuery = `
     query {
