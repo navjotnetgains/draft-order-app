@@ -1,16 +1,3 @@
-/*
-  Warnings:
-
-  - You are about to drop the `session` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `setting` table. If the table is not empty, all the data it contains will be lost.
-
-*/
--- DropTable
-DROP TABLE "public"."session";
-
--- DropTable
-DROP TABLE "public"."setting";
-
 -- CreateTable
 CREATE TABLE "public"."Session" (
     "id" TEXT NOT NULL,
