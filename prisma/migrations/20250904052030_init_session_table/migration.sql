@@ -1,5 +1,18 @@
+/*
+  Warnings:
+
+  - You are about to drop the `session` table. If the table is not empty, all the data it contains will be lost.
+  - You are about to drop the `setting` table. If the table is not empty, all the data it contains will be lost.
+
+*/
+-- DropTable
+DROP TABLE "public"."session";
+
+-- DropTable
+DROP TABLE "public"."setting";
+
 -- CreateTable
-CREATE TABLE "public"."session" (
+CREATE TABLE "public"."Session" (
     "id" TEXT NOT NULL,
     "shop" TEXT NOT NULL,
     "state" TEXT NOT NULL,
@@ -16,11 +29,11 @@ CREATE TABLE "public"."session" (
     "collaborator" BOOLEAN DEFAULT false,
     "emailVerified" BOOLEAN DEFAULT false,
 
-    CONSTRAINT "session_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Session_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "public"."setting" (
+CREATE TABLE "public"."Setting" (
     "shop" TEXT NOT NULL,
     "doubleDraftOrdersEnabled" BOOLEAN NOT NULL DEFAULT false,
     "discount1" DOUBLE PRECISION DEFAULT 0,
@@ -30,5 +43,5 @@ CREATE TABLE "public"."setting" (
     "singleDiscount" DOUBLE PRECISION DEFAULT 0,
     "singleTag" TEXT DEFAULT '',
 
-    CONSTRAINT "setting_pkey" PRIMARY KEY ("shop")
+    CONSTRAINT "Setting_pkey" PRIMARY KEY ("shop")
 );

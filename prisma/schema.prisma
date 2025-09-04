@@ -23,12 +23,7 @@ model Session {
   locale        String?
   collaborator  Boolean?  @default(false)
   emailVerified Boolean?  @default(false)
-
-  @@map("session") 
-
 }
-
-
 
 model Setting {
   shop                     String  @id
@@ -39,6 +34,4 @@ model Setting {
   tag2                     String? @default("")
   singleDiscount           Float?  @default(0)
   singleTag                String? @default("")
-
-  @@map("setting")
 }
