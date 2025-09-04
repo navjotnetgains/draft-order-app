@@ -3,7 +3,7 @@
 client_id = "9fd275d862c675142a61cf6f07aff2dc"
 name = "Draft Order App"
 handle = "draft-orders-app-4"
-application_url = "https://constructed-disciplines-club-bottle.trycloudflare.com"
+application_url = "https://cancel-confidence-needed-boards.trycloudflare.com"
 embedded = true
 
 [build]
@@ -27,7 +27,7 @@ api_version = "2025-07"
 scopes = "read_themes,read_draft_orders,write_products,read_products,read_customers,write_draft_orders,write_customers"
 
 [auth]
-redirect_urls = ["https://constructed-disciplines-club-bottle.trycloudflare.com/auth/callback", "https://constructed-disciplines-club-bottle.trycloudflare.com/auth/shopify/callback", "https://constructed-disciplines-club-bottle.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://cancel-confidence-needed-boards.trycloudflare.com/auth/callback", "https://cancel-confidence-needed-boards.trycloudflare.com/auth/shopify/callback", "https://cancel-confidence-needed-boards.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

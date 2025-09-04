@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "public"."Session" (
+CREATE TABLE "public"."session" (
     "id" TEXT NOT NULL,
     "shop" TEXT NOT NULL,
     "state" TEXT NOT NULL,
@@ -16,11 +16,11 @@ CREATE TABLE "public"."Session" (
     "collaborator" BOOLEAN DEFAULT false,
     "emailVerified" BOOLEAN DEFAULT false,
 
-    CONSTRAINT "Session_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "session_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "public"."Setting" (
+CREATE TABLE "public"."setting" (
     "shop" TEXT NOT NULL,
     "doubleDraftOrdersEnabled" BOOLEAN NOT NULL DEFAULT false,
     "discount1" DOUBLE PRECISION DEFAULT 0,
@@ -30,5 +30,5 @@ CREATE TABLE "public"."Setting" (
     "singleDiscount" DOUBLE PRECISION DEFAULT 0,
     "singleTag" TEXT DEFAULT '',
 
-    CONSTRAINT "Setting_pkey" PRIMARY KEY ("shop")
+    CONSTRAINT "setting_pkey" PRIMARY KEY ("shop")
 );

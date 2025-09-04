@@ -1,7 +1,7 @@
 
 client_id = "9fd275d862c675142a61cf6f07aff2dc"
 name = "Draft Order App"
-handle = "draft-orders-app-4"
+handle = "draft-orders-app-4" 
 application_url = "https://draft-order-app-seven.vercel.app/"
 embedded = true
 
