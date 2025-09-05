@@ -401,38 +401,58 @@ function initializeDraftOrder() {
     }
     
     // Set up cart notification button
-  function setupCartNotificationButton() {
-  const containers = document.querySelectorAll('.cart-notification, #cart-notification, .cart-drawer, #CartDrawer');
+function setupCartNotificationButton() {
+  fetchCart().then(cart => {
+    const containers = document.querySelectorAll(
+      '.cart-notification, #cart-notification, .cart-drawer, #CartDrawer'
+    );
 
-  containers.forEach(cartNotification => {
-    if (cartNotification && !cartNotification.querySelector('#create-draft-order-notification')) {
-      const button = document.createElement('button');
-      button.id = 'create-draft-order-notification';
-      button.textContent = '{{ block.settings.text | default: "Create Draft Order" | escape }}';
-
-      // Add a class so we can style separately for drawer vs notification
-      if (cartNotification.classList.contains('cart-drawer') || cartNotification.id === 'CartDrawer') {
-        button.className = 'create-draft-order-btn drawer-style';
-      } else {
-        button.className = 'create-draft-order-btn notification-style';
+    containers.forEach(cartNotification => {
+      // Remove button if cart empty
+      const existingBtn = cartNotification.querySelector('#create-draft-order-notification');
+      if (cart.items.length === 0) {
+        if (existingBtn) existingBtn.remove();
+        return;
       }
 
-      // Keep positioning logic
-      const checkoutBtn = cartNotification.querySelector('[href="/checkout"], button[name="checkout"]');
-      const linksSection = cartNotification.querySelector('.cart-notification__links, .cart-drawer__footer');
+      // Add button if not already present
+      if (!existingBtn) {
+        const button = document.createElement('button');
+        button.id = 'create-draft-order-notification';
+        button.textContent = '{{ block.settings.text | default: "Create Draft Order" | escape }}';
 
-      if (checkoutBtn) {
-        checkoutBtn.parentNode.insertBefore(button, checkoutBtn);
-      } else if (linksSection) {
-        linksSection.prepend(button);
-      } else {
-        cartNotification.appendChild(button);
+        // Style for drawer vs notification
+        if (
+          cartNotification.classList.contains('cart-drawer') ||
+          cartNotification.id === 'CartDrawer'
+        ) {
+          button.className = 'create-draft-order-btn drawer-style';
+        } else {
+          button.className = 'create-draft-order-btn notification-style';
+        }
+
+        // Insert near checkout button or fallback
+        const checkoutBtn = cartNotification.querySelector(
+          '[href="/checkout"], button[name="checkout"]'
+        );
+        const linksSection = cartNotification.querySelector(
+          '.cart-notification__links, .cart-drawer__footer'
+        );
+
+        if (checkoutBtn) {
+          checkoutBtn.parentNode.insertBefore(button, checkoutBtn);
+        } else if (linksSection) {
+          linksSection.prepend(button);
+        } else {
+          cartNotification.appendChild(button);
+        }
+
+        button.addEventListener('click', handleDraftOrderClick);
       }
-
-      button.addEventListener('click', handleDraftOrderClick);
-    }
+    });
   });
 }
+
 
 // Run on load + updates
 document.addEventListener('DOMContentLoaded', setupCartNotificationButton);
