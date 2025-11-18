@@ -6,344 +6,314 @@ import nodemailer from "nodemailer";
 import { authenticate } from "../shopify.server";
 
 export async function action({ request }) {
-  console.log(
-    `[${new Date().toISOString()}] Starting draft order creation for request to /api/create-draft-order`
-  );
+  console.log(`[${new Date().toISOString()}] Starting /api/create-draft-order`);
 
+  let body;
   try {
-    // Parse body FIRST (so we can extract shop param if needed)
-    let body;
-    try {
-      body = await request.json();
-    } catch {
-      throw new Error("Invalid JSON in request body");
-    }
-    const { customer, cart, address, billingAddress, useShipping, shop: shopFromBody } = body;
-    if (!cart?.items?.length) throw new Error("Cart is empty");
+    
+    body = await request.json();
+  } catch {
+    return await sendError(request, "Invalid JSON in request body", 400);
+  }
 
-    // Authenticate with session, fallback to DB if needed
-    let session;
-    try {
-      const authResult = await authenticate.admin(request);
-      session = authResult.session;
-      console.log(
-        `[${new Date().toISOString()}] Authentication successful for shop: ${session.shop}`
-      );
-    } catch (authError) {
-      console.error(
-        `[${new Date().toISOString()}] Authentication failed, trying DB fallback: ${authError.message}`
-      );
+  const { customer, cart, address, billingAddress, useShipping, shop: shopFromBody } = body;
+  if (!cart?.items?.length) return await sendError(request, "Cart is empty", 400);
 
-      if (!shopFromBody) throw new Error("No shop param provided in body for DB fallback");
+  let shop, accessToken;
 
-      const sessionRecord = await db.session.findFirst({ where: { shop: shopFromBody } });
-      if (!sessionRecord) throw new Error("No DB session found");
+  // Step 1: Try normal Shopify authentication (preferred)
+  try {
+    const authResult = await authenticate.admin(request);
+    shop = authResult.session.shop;
+    accessToken = authResult.session.accessToken;
+    console.log(`Authenticated via OAuth for shop: ${shop}`);
+  } catch (authError) {
+    console.warn("OAuth failed, falling back to DB token...", authError.message);
 
-      session = {
-        shop: sessionRecord.shop,
-        accessToken: sessionRecord.accessToken,
-        scope: sessionRecord.scope,
-      };
+    // Step 2: Fallback to DB — but validate token first!
+    if (!shopFromBody) {
+      return await sendError(request, "Authentication failed and no shop provided in body", 401);
     }
 
-    // Prefer session.shop, fallback to body.shop
-    const shop = session?.shop || shopFromBody;
-    const accessToken = session?.accessToken;
-    if (!shop) throw new Error("No shop param provided (missing in session and body)");
-    if (!accessToken) throw new Error("Missing access token for shop");
+    const sessionRecord = await db.session.findFirst({
+      where: { shop: shopFromBody },
+    });
 
-    // Load shop settings
-    let setting = await db.setting.findUnique({ where: { shop } });
-    if (!setting) {
-      setting = await db.setting.create({
-        data: {
-          shop,
-          doubleDraftOrdersEnabled: false,
-          discount1: 0,
-          discount2: 0,
-          tag1: "",
-          tag2: "",
-          singleDiscount: 0,
-          singleTag: "",
+    if (!sessionRecord?.accessToken) {
+      return await sendError(
+        request,
+        "No valid session found. Please reinstall the app on your store.",
+        401
+      );
+    }
+
+    // Step 3: Validate the stored token is still working
+    const testUrl = `https://${shopFromBody}/admin/api/2024-10/shop.json`;
+    try {
+      const testRes = await fetch(testUrl, {
+        headers: {
+          "X-Shopify-Access-Token": sessionRecord.accessToken,
         },
       });
+
+      if (!testRes.ok) {
+        const errorText = await testRes.text();
+        console.error("Stored token invalid:", testRes.status, errorText);
+        return await sendError(
+          request,
+          "Your app needs to be reinstalled. Access token is no longer valid. <a href='/auth?shop=" +
+            shopFromBody +
+            "'>Click here to reinstall</a>",
+          401
+        );
+      }
+    } catch (testErr) {
+      console.error("Token test failed:", testErr.message);
+      return await sendError(request, "Unable to validate access token. Please reinstall the app.", 401);
     }
 
-    const adminGraphQLEndpoint = `https://${shop}/admin/api/2024-10/graphql.json`;
-    const headers = {
-      "Content-Type": "application/json",
-      "X-Shopify-Access-Token": accessToken,
-    };
-
-    // Build line items
-    const lineItems = cart.items.map((item) => ({
-      quantity: item.quantity,
-      variantId: `gid://shopify/ProductVariant/${item.variant_id}`,
-    }));
-
-    // Addresses
-    const shippingAddress = {
-      address1: address?.address1 || "",
-      address2: address?.apartment || "",
-      city: address?.city || "",
-      province: address?.state || "",
-      country: address?.country || "",
-      company: address?.company || "",
-      zip: address?.pin || "",
-      firstName: customer?.first_name || "",
-      lastName: customer?.last_name || "",
-    };
-    const billingAddressInput = useShipping
-      ? shippingAddress
-      : {
-          address1: billingAddress?.address1 || "",
-          address2: billingAddress?.apartment || "",
-          city: billingAddress?.city || "",
-          province: billingAddress?.state || "",
-          country: billingAddress?.country || "",
-          company: billingAddress?.company || "",
-          zip: billingAddress?.pin || "",
-          firstName: customer?.first_name || "",
-          lastName: customer?.last_name || "",
-        };
-
-    // Draft order mutation
-    const draftOrderMutation = `
-      mutation createDraftOrder($input: DraftOrderInput!) {
-  draftOrderCreate(input: $input) {
-    draftOrder {
-      id
-      name
-      invoiceUrl
-      createdAt
-      totalPriceSet { shopMoney { amount currencyCode } }
-
-      customer {
-        id
-        email
-        firstName
-        lastName
-      }
-      shippingAddress {
-        firstName
-        lastName
-        address1
-        address2
-        city
-        province
-        country
-        zip
-        company
-      }
-      billingAddress {
-        firstName
-        lastName
-        address1
-        address2
-        city
-        province
-        country
-        zip
-        company
-      }
-
-      lineItems(first: 250) {
-        edges {
-          node {
-            title
-            quantity
-            variant {
-              id
-              title
-              image { url }
-            }
-            originalUnitPriceSet {
-              shopMoney { amount currencyCode }
-            }
-          }
-        }
-      }
-    }
-    userErrors { field message }
+    shop = sessionRecord.shop;
+    accessToken = sessionRecord.accessToken;
+    console.log(`Using valid stored token for ${shop}`);
   }
-}
 
-    `;
-
-    // Helper to create draft orders
-    // Helper to create draft orders
-const createDraft = async (discountAmount, discountLabel, tag) => {
- const input = {
-  visibleToCustomer: false,
-  lineItems,
-  note: "Created via Draft App",
-  tags: [tag].filter(Boolean),
-
-  // ✅ Customer link (either by ID or by email)
-  ...(customer?.id && {
-    customerId: `gid://shopify/Customer/${customer.id}`,
-  }),
-  ...(!customer?.id && customer?.email && {
-    email: customer.email,
-  }),
-
-  // ✅ Addresses
-  shippingAddress,
-  billingAddress: billingAddressInput,
-
-  // ✅ Discount
-  ...(discountAmount > 0 && {
-    appliedDiscount: {
-      title: discountLabel,
-      description: discountLabel,
-      value: parseFloat(discountAmount),
-      valueType: "PERCENTAGE",
-    },
-  }),
-};
-
-  const res = await fetch(adminGraphQLEndpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ query: draftOrderMutation, variables: { input } }),
-  });
-  const data = await res.json();
-
-  if (data.errors) throw new Error(JSON.stringify(data.errors));
-  const userErrors = data.data.draftOrderCreate.userErrors;
-  if (userErrors?.length) throw new Error(userErrors.map((e) => e.message).join(", "));
-
-  return data.data.draftOrderCreate.draftOrder;
-};
-
-    // Create orders
-    let createdOrders = [];
-    if (setting.doubleDraftOrdersEnabled) {
-      const draft1 = await createDraft(setting.discount1, "Discount 1", setting.tag1);
-      const draft2 = await createDraft(setting.discount2, "Discount 2", setting.tag2);
-      createdOrders = [draft1, draft2];
-    } else {
-      const draft = await createDraft(setting.singleDiscount, "Single Discount", setting.singleTag);
-      createdOrders = [draft];
-    }
-
-    // Send confirmation email
-    let emailSent = false;
-    if (customer?.email) {
-      try {
-        const transporter = nodemailer.createTransport({
-          host: "smtp.gmail.com",
-          port: 465,
-          secure: true,
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-        });
-
-        const firstOrder = createdOrders[0];
-        let summaryHTML = `
-          <div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif;color:#333;border:1px solid #e5e5e5;border-radius:8px;">
-            <div style="padding:20px;">
-              <h2>Hello ${customer.first_name || "Customer"}, your order is saved in draft orders</h2>
-              <p>Good news! We've saved your order as a draft. You can review it now, and we'll be in touch shortly to finalize everything.</p>
-            </div>
-            <div style="border-top:1px solid #e5e5e5;padding:20px;">
-              <h3>Order Summary</h3>
-        `;
-
-        let grandTotal = 0;
-        firstOrder.lineItems.edges.forEach(({ node }) => {
-          const price = parseFloat(node.originalUnitPriceSet.shopMoney.amount);
-          const total = price * node.quantity;
-          grandTotal += total;
-          const currency = node.originalUnitPriceSet.shopMoney.currencyCode;
-          const variantTitle =
-            node.variant?.title && node.variant.title !== "Default Title"
-              ? ` - ${node.variant.title}`
-              : "";
-          const imageUrl = node.variant?.image?.url || "https://via.placeholder.com/60";
-
-          summaryHTML += `
-            <div style="padding:10px 0;border-bottom:1px solid #e5e5e5;display:flex;align-items:center;gap:15px;">
-              <img src="${imageUrl}" alt="${node.title}" width="50" height="50" style="border-radius:4px;border:1px solid #ddd;object-fit:cover;">
-              <div style="flex:1;">
-                <div style="font-size:14px;font-weight:500;">${node.title}${variantTitle}</div>
-                <div style="font-size:13px;color:#666;">× ${node.quantity}</div>
-              </div>
-              <div style="font-size:14px;font-weight:500;">${currency} ${total.toFixed(2)}</div>
-            </div>
-          `;
-        });
-
-        summaryHTML += `
-            </div>
-            <div style="padding:20px;border-top:1px solid #333;display:flex;justify-content:space-between;font-weight:bold;font-size:16px;">
-              <span>Total</span>
-              <span>${firstOrder.lineItems.edges[0]?.node.originalUnitPriceSet.shopMoney.currencyCode} ${grandTotal.toFixed(2)}</span>
-            </div>
-            <div style="background:#f8f8f8;padding:15px;text-align:center;font-size:12px;color:#777;">
-              <p>Need help? Contact us at <a href="mailto:support@${shop}">support@${shop}</a></p>
-              <p>&copy; ${new Date().getFullYear()} ${shop}. All rights reserved.</p>
-            </div>
-          </div>
-        `;
-
-        await transporter.sendMail({
-          from: `"${shop}" <${process.env.SMTP_USER}>`,
-          to: customer.email,
-          subject: "Your order is now in draft status",
-          html: summaryHTML,
-        });
-
-        emailSent = true;
-      } catch (e) {
-        console.error("Email error:", e.message);
-      }
-    }
-
-    // ✅ Response with CORS
-    return await cors(
-      request,
-      json({ success: true, drafts: createdOrders, emailSent }),
-      {
-        origin: request.headers.get("Origin") || "*",
-        methods: ["POST", "OPTIONS"],
-        headers: ["Content-Type"],
-      }
-    );
-  } catch (error) {
-    console.error("Draft Order Error:", error.message);
-    return await cors(
-      request,
-      json({ success: false, error: error.message }, { status: 500 }),
-      {
-        origin: request.headers.get("Origin") || "*",
-        methods: ["POST", "OPTIONS"],
-        headers: ["Content-Type"],
-      }
-    );
+  if (!shop || !accessToken) {
+    return await sendError(request, "Missing shop or access token", 500);
   }
-}
 
-export async function loader({ request }) {
-  console.log(
-    `[${new Date().toISOString()}] Loader handling method: ${request.method}`
-  );
-
-  // ✅ Preflight request, no auth needed
-  if (request.method === "OPTIONS") {
-    const origin = request.headers.get("Origin");
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": origin || "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-        Vary: "Origin",
+  // Load or create settings
+  let setting = await db.setting.findUnique({ where: { shop } });
+  if (!setting) {
+    setting = await db.setting.create({
+      data: {
+        shop,
+        doubleDraftOrdersEnabled: false,
+        discount1: 0,
+        discount2: 0,
+        tag1: "",
+        tag2: "",
+        singleDiscount: 0,
+        singleTag: "",
       },
     });
   }
 
+  const endpoint = `https://${shop}/admin/api/2024-10/graphql.json`;
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Shopify-Access-Token": accessToken,
+  };
+
+  const lineItems = cart.items.map((item) => ({
+    quantity: item.quantity,
+    variantId: `gid://shopify/ProductVariant/${item.variant_id}`,
+  }));
+
+  const shippingAddress = {
+    firstName: customer?.first_name || "",
+    lastName: customer?.last_name || "",
+    address1: address?.address1 || "",
+    address2: address?.apartment || "",
+    city: address?.city || "",
+    province: address?.state || "",
+    country: address?.country || "",
+    zip: address?.pin || "",
+    company: address?.company || "",
+  };
+
+  const billingAddressInput = useShipping
+    ? shippingAddress
+    : {
+        firstName: customer?.first_name || "",
+        lastName: customer?.last_name || "",
+        address1: billingAddress?.address1 || "",
+        address2: billingAddress?.apartment || "",
+        city: billingAddress?.city || "",
+        province: billingAddress?.state || "",
+        country: billingAddress?.country || "",
+        zip: billingAddress?.pin || "",
+        company: billingAddress?.company || "",
+      };
+
+  const draftOrderMutation = `
+    mutation draftOrderCreate($input: DraftOrderInput!) {
+      draftOrderCreate(input: $input) {
+        draftOrder {
+          id name invoiceUrl createdAt
+          totalPriceSet { shopMoney { amount currencyCode } }
+          customer { id email firstName lastName }
+          lineItems(first: 250) {
+            edges {
+              node {
+                title quantity
+                variant { id title image { url } }
+                originalUnitPriceSet { shopMoney { amount currencyCode } }
+              }
+            }
+          }
+        }
+        userErrors { field message }
+      }
+    }
+  `;
+
+  const createDraft = async (discount = 0, label = "Discount", tag = "") => {
+    const input = {
+      visibleToCustomer: false,
+      lineItems,
+      note: "Created via Draft Order App",
+      tags: tag ? [tag] : [],
+      shippingAddress,
+      billingAddress: billingAddressInput,
+      ...(customer?.id
+        ? { customerId: `gid://shopify/Customer/${customer.id}` }
+        : customer?.email
+        ? { email: customer.email }
+        : {}),
+      ...(discount > 0 && {
+        appliedDiscount: {
+          title: label,
+          description: label,
+          value: parseFloat(discount),
+          valueType: "PERCENTAGE",
+        },
+      }),
+    };
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ query: draftOrderMutation, variables: { input } }),
+    });
+
+    const data = await res.json();
+
+    if (data.errors || data.data?.draftOrderCreate?.userErrors?.length) {
+      const err = data.errors || data.data.draftOrderCreate.userErrors;
+      throw new Error(JSON.stringify(err));
+    }
+
+    return data.data.draftOrderCreate.draftOrder;
+  };
+
+  try {
+    let createdOrders = [];
+    if (setting.doubleDraftOrdersEnabled) {
+      // Create two orders only if both discounts are set > 0
+      if (setting.discount1 > 0 && setting.discount2 > 0) {
+        createdOrders.push(await createDraft(setting.discount1, "Discount Option 1", setting.tag1));
+        createdOrders.push(await createDraft(setting.discount2, "Discount Option 2", setting.tag2));
+      } else {
+        // Fallback to single if double enabled but discounts not set
+        createdOrders.push(await createDraft(setting.singleDiscount, "Your Discount", setting.singleTag));
+      }
+    } else {
+      createdOrders.push(await createDraft(setting.singleDiscount, "Your Discount", setting.singleTag));
+    }
+
+    // Send Email
+    let emailSent = false;
+    if (customer?.email && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      try {
+        const transporter = nodemailer.createTransporter({
+          host: "smtp.gmail.com",
+          port: 465,
+          secure: true,
+          auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        });
+
+        const order = createdOrders[0];
+        let itemsHtml = "";
+        let total = 0;
+
+        order.lineItems.edges.forEach(({ node }) => {
+          const price = parseFloat(node.originalUnitPriceSet.shopMoney.amount);
+          const lineTotal = price * node.quantity;
+          total += lineTotal;
+          const img = node.variant?.image?.url || "https://via.placeholder.com/80";
+
+          itemsHtml += `
+            <div style="display:flex; gap:16px; padding:12px 0; border-bottom:1px solid #eee;">
+              <img src="${img}" width="60" height="60" style="object-fit:cover; border-radius:6px;">
+              <div style="flex:1;">
+                <div style="font-weight:600;">${node.title}</div>
+                ${node.variant?.title !== "Default Title" ? `<div style="color:#666; font-size:14px;">${node.variant.title}</div>` : ""}
+                <div style="color:#666; margin-top:4px;">Qty: ${node.quantity}</div>
+              </div>
+              <div style="font-weight:600;">${node.originalUnitPriceSet.shopMoney.currencyCode} ${lineTotal.toFixed(2)}</div>
+            </div>`;
+        });
+
+        const currency = order.totalPriceSet.shopMoney.currencyCode;
+        const orderTotal = parseFloat(order.totalPriceSet.shopMoney.amount).toFixed(2);
+
+        const html = `
+          <div style="font-family:Arial,sans-serif; max-width:600px; margin:0 auto; border:1px solid #ddd; border-radius:10px; overflow:hidden;">
+            <div style="background:#1a1a1a; color:white; padding:20px; text-align:center;">
+              <h1>Order Saved as Draft!</h1>
+            </div>
+            <div style="padding:24px;">
+              <p>Hi ${customer.first_name || "there"},</p>
+              <p>We’ve saved your cart as a draft order. You can complete payment anytime using the link below.</p>
+              <div style="text-align:center; margin:30px 0;">
+                <a href="${order.invoiceUrl}" style="background:#0099cc; color:white; padding:14px 28px; text-decoration:none; border-radius:6px; font-weight:bold;">Complete Your Order</a>
+              </div>
+              <h3>Order Summary</h3>
+              ${itemsHtml}
+              <div style="margin-top:20px; padding-top:20px; border-top:2px solid #000; font-size:18px; font-weight:bold; text-align:right;">
+                Total: ${currency} ${orderTotal}
+              </div>
+            </div>
+            <div style="background:#f8f8f8; padding:16px; text-align:center; font-size:12px; color:#666;">
+              Questions? Reply to this email or contact us at support@${shop.replace(".myshopify.com", ".com")}
+            </div>
+          </div>`;
+
+        await transporter.sendMail({
+          from: `"${shop.replace(".myshopify.com", "")}" <${process.env.SMTP_USER}>`,
+          to: customer.email,
+          subject: "Your order is ready – complete payment anytime!",
+          html,
+        });
+
+        emailSent = true;
+      } catch (emailErr) {
+        console.error("Email failed:", emailErr.message);
+      }
+    }
+
+    return await cors(
+      request,
+      json({ success: true, drafts: createdOrders, emailSent }),
+      { origin: request.headers.get("Origin") || "*", methods: ["POST", "OPTIONS"] }
+    );
+  } catch (error) {
+    console.error("Draft creation failed:", error.message);
+    return await sendError(request, error.message, 500);
+  }
+}
+
+// Helper to send consistent errors
+async function sendError(request, message, status = 500) {
+  return await cors(
+    request,
+    json({ success: false, error: message }, { status }),
+    { origin: request.headers.get("Origin") || "*", methods: ["POST", "OPTIONS"] }
+  );
+}
+
+// Handle CORS preflight
+export async function loader({ request }) {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": request.headers.get("Origin") || "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        Vary: "Origin",
+      },
+    });
+  }
   return new Response("Method Not Allowed", { status: 405 });
 }

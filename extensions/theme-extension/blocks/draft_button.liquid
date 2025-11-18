@@ -1,4 +1,14 @@
 <!-- Draft Order Button -->
+<script id="draftorder-data" type="application/json">{
+  "shop": {{ shop.permanent_domain | json }},
+  "customer": {
+    "id": {{ customer.id | json }},
+    "email": {{ customer.email | json }},
+    "first_name": {{ customer.first_name | json }},
+    "last_name": {{ customer.last_name | json }}
+  }
+}
+</script>
 {% if template.name == 'cart' %}
 {% if cart.item_count == 0 %}
   <p style="text-align: center; margin: 20px 0; font-size: 16px; color: #555; ">
@@ -257,6 +267,10 @@
 </style>
 
 <script>
+(function() {
+const draftorderData = JSON.parse(document.getElementById('draftorder-data').textContent);
+const customer = draftorderData.customer;
+
 
   let toastContainer = document.createElement('div');
   toastContainer.id = 'toast-container';
@@ -301,12 +315,7 @@
     }, duration);
   }
 
-  window.customerData = {
-    id: {{ customer.id | json }},
-    email: {{ customer.email | json }},
-    first_name: {{ customer.first_name | json }},
-    last_name: {{ customer.last_name | json }}
-  };
+
 
   async function loadCountries(selectId,stateId){
     const countrySelect = document.getElementById(selectId);
@@ -358,7 +367,7 @@ function initializeDraftOrder() {
     async function handleDraftOrderClick(e) {
       e.preventDefault();
       
-      if (!window.customerData?.email) {
+      if (!draftorderData.customer?.email) {
         showToast("Please log in as a customer.");
         return;
       }
@@ -504,7 +513,7 @@ document.addEventListener('cart:drawer:open', setupCartNotificationButton);
     if (submitBtn) {
       submitBtn.addEventListener('click', async () => {
         // Get shop domain
-        const shop = getShopDomain();
+     const shop = draftorderData.shop;
         if (!shop) {
           showToast("Unable to determine shop domain.");
           return;
@@ -580,7 +589,7 @@ document.addEventListener('cart:drawer:open', setupCartNotificationButton);
         }
 
         const cart = await fetchCart();
-        const customer = window.customerData;
+        const customer = draftorderData.customer;
 
         const discount = cart.discount_codes?.[0] || null;
 
@@ -638,6 +647,7 @@ document.addEventListener('cart:drawer:open', setupCartNotificationButton);
     }
   `;
   document.head.appendChild(styleEl);
+  })()
 </script>
 
 {% schema %}

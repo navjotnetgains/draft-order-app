@@ -24,7 +24,7 @@ api_version = "2025-07"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_themes,read_draft_orders,write_products,read_products,read_customers,write_draft_orders,write_customers"
+scopes = "write_themes,read_themes,read_draft_orders,write_products,read_products,read_customers,write_draft_orders,write_customers"
 
 [auth]
 redirect_urls = ["https://japanese-fg-relationships-puzzle.trycloudflare.com/auth/callback", "https://japanese-fg-relationships-puzzle.trycloudflare.com/auth/shopify/callback", "https://japanese-fg-relationships-puzzle.trycloudflare.com/api/auth/callback"]

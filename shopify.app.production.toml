@@ -7,7 +7,6 @@ embedded = true
 
 [build]
 automatically_update_urls_on_dev = false
-include_config_on_deploy = true
 
 [webhooks]
 api_version = "2025-07"
@@ -23,7 +22,7 @@ api_version = "2025-07"
   uri = "/webhooks/app/uninstalled"
 
 [access_scopes]
-scopes = "read_themes,read_draft_orders,write_products,read_products,read_customers,write_draft_orders,write_customers"
+scopes = "read_themes,, write_themes,read_draft_orders,write_products,read_products,read_customers,write_draft_orders,write_customers"
 
 [auth]
 redirect_urls = ["https://draft-order-app-seven.vercel.app//auth/callback", "https://draft-order-app-seven.vercel.app//auth/shopify/callback", "https://draft-order-app-seven.vercel.app//api/auth/callback"]
