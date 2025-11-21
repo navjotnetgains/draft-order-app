@@ -9,37 +9,6 @@
   }
 }
 </script>
-{% if template.name == 'cart' %}
-{% if cart.item_count == 0 %}
-  <p style="text-align: center; margin: 20px 0; font-size: 16px; color: #555; ">
-   <a href="/collections/all" style="color: #4f5051ff; text-decoration: none;">
-     Start adding your favorite items!
-   </a>
-  </p>
-{% else %}
- <div class="page-width" id="main" style="display:flex; justify-content: {{ block.settings.alignment }};">
-  <button
-        id="create-draft-order"
-        style="
-          background-color: {{ block.settings.background_color | default: '#070707ff' }};
-          color: {{ block.settings.text_color | default: '#ffffff' }};
-          padding: 12px 24px;
-          border: none;
-          font-size:  15px; /* Responsive font size */
-          cursor: pointer;
-          margin-top: 0;
-          width: 100%; /* Full width on small screens */
-          max-width: 350px; /* Limits width on larger screens */
-          white-space: nowrap; /* Prevents text wrapping */
-          margin-bottom:50px;
-        "
-      >
-    {{ block.settings.text | default: "Create Draft Order" | escape }}
-  </button>
-</div>
-
-{% endif %}
-{% endif %}
 
 
 <!-- Fullscreen Modal Backdrop + Form -->
@@ -344,11 +313,16 @@ const customer = draftorderData.customer;
       console.log( 'error fetching country')
     }
   }
+let cachedCart = null;
 
-  function fetchCart() {
-    return fetch('/cart.js').then(res => res.json());
-  }
-
+function fetchCart() {
+  return fetch('/cart.js')
+    .then(res => res.json())
+    .then(cart => {
+      cachedCart = cart;
+      return cart;
+    });
+}
   // Add the missing clearErrors function
   function clearErrors(fields) {
     fields.forEach(field => {
@@ -364,23 +338,34 @@ function initializeDraftOrder() {
     const submitLoader = document.getElementById('submit-loader');
     
     // Function to handle the draft order button click
-    async function handleDraftOrderClick(e) {
-      e.preventDefault();
-      
-      if (!draftorderData.customer?.email) {
-        showToast("Please log in as a customer.");
-        return;
-      }
-      
-      const cart = await fetchCart();
-      if (!cart.items || cart.items.length === 0) {
-        showToast("Your cart is empty. Please add items first.");
-        return;
-      }
-      
-      modal.style.display = 'flex';
-    }
-    
+  let cachedCart = null;
+
+function fetchCart() {
+  return fetch('/cart.js')
+    .then(res => res.json())
+    .then(cart => {
+      cachedCart = cart;
+      return cart;
+    });
+}
+
+// Then in handleDraftOrderClick:
+async function handleDraftOrderClick(e) {
+  e.preventDefault();
+  
+  if (!draftorderData.customer?.email) {
+    showToast("Please log in as a customer.");
+    return;
+  }
+  
+  // Check cached cart first
+  if (cachedCart && cachedCart.items.length === 0) {
+    showToast("Your cart is empty. Please add items first.");
+    return;
+  }
+  
+  modal.style.display = 'flex';
+}
     // Get shop domain from Shopify global object or URL
     function getShopDomain() {
       // Try different methods to get the shop domain
@@ -635,8 +620,6 @@ document.addEventListener('cart:drawer:open', setupCartNotificationButton);
   // Initialize everything
   initializeDraftOrder();
 
-
-  
 
   // Loader spin animation
   const styleEl = document.createElement('style');

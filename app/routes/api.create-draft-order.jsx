@@ -211,76 +211,60 @@ export async function action({ request }) {
       createdOrders.push(await createDraft(setting.singleDiscount, "Your Discount", setting.singleTag));
     }
 
-    // Send Email
-    let emailSent = false;
-    if (customer?.email && process.env.SMTP_USER && process.env.SMTP_PASS) {
-      try {
-        const transporter = nodemailer.createTransporter({
-          host: "smtp.gmail.com",
-          port: 465,
-          secure: true,
-          auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-        });
+   // Send Email
+let emailSent = false;
 
-        const order = createdOrders[0];
-        let itemsHtml = "";
-        let total = 0;
+if (customer?.email && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
 
-        order.lineItems.edges.forEach(({ node }) => {
-          const price = parseFloat(node.originalUnitPriceSet.shopMoney.amount);
-          const lineTotal = price * node.quantity;
-          total += lineTotal;
-          const img = node.variant?.image?.url || "https://via.placeholder.com/80";
+    const order = createdOrders[0];
+    let itemsHtml = "";
+    let total = 0;
 
-          itemsHtml += `
-            <div style="display:flex; gap:16px; padding:12px 0; border-bottom:1px solid #eee;">
-              <img src="${img}" width="60" height="60" style="object-fit:cover; border-radius:6px;">
-              <div style="flex:1;">
-                <div style="font-weight:600;">${node.title}</div>
-                ${node.variant?.title !== "Default Title" ? `<div style="color:#666; font-size:14px;">${node.variant.title}</div>` : ""}
-                <div style="color:#666; margin-top:4px;">Qty: ${node.quantity}</div>
-              </div>
-              <div style="font-weight:600;">${node.originalUnitPriceSet.shopMoney.currencyCode} ${lineTotal.toFixed(2)}</div>
-            </div>`;
-        });
+    order.lineItems.edges.forEach(({ node }) => {
+      const price = parseFloat(node.originalUnitPriceSet.shopMoney.amount);
+      const lineTotal = price * node.quantity;
+      total += lineTotal;
+      const img = node.variant?.image?.url || "https://via.placeholder.com/80";
 
-        const currency = order.totalPriceSet.shopMoney.currencyCode;
-        const orderTotal = parseFloat(order.totalPriceSet.shopMoney.amount).toFixed(2);
+      itemsHtml += `
+        <div style="display:flex; gap:16px; padding:12px 0; border-bottom:1px solid #eee;">
+          <img src="${img}" width="60" height="60" style="object-fit:cover; border-radius:6px;">
+          <div style="flex:1;">
+            <div style="font-weight:600;">${node.title}</div>
+            ${node.variant?.title !== "Default Title" ? `<div style="color:#666; font-size:14px;">${node.variant.title}</div>` : ""}
+            <div style="color:#666; margin-top:4px;">Qty: ${node.quantity}</div>
+          </div>
+          <div style="font-weight:600;">${node.originalUnitPriceSet.shopMoney.currencyCode} ${lineTotal.toFixed(2)}</div>
+        </div>`;
+    });
 
-        const html = `
-          <div style="font-family:Arial,sans-serif; max-width:600px; margin:0 auto; border:1px solid #ddd; border-radius:10px; overflow:hidden;">
-            <div style="background:#1a1a1a; color:white; padding:20px; text-align:center;">
-              <h1>Order Saved as Draft!</h1>
-            </div>
-            <div style="padding:24px;">
-              <p>Hi ${customer.first_name || "there"},</p>
-              <p>We’ve saved your cart as a draft order. You can complete payment anytime using the link below.</p>
-              <div style="text-align:center; margin:30px 0;">
-                <a href="${order.invoiceUrl}" style="background:#0099cc; color:white; padding:14px 28px; text-decoration:none; border-radius:6px; font-weight:bold;">Complete Your Order</a>
-              </div>
-              <h3>Order Summary</h3>
-              ${itemsHtml}
-              <div style="margin-top:20px; padding-top:20px; border-top:2px solid #000; font-size:18px; font-weight:bold; text-align:right;">
-                Total: ${currency} ${orderTotal}
-              </div>
-            </div>
-            <div style="background:#f8f8f8; padding:16px; text-align:center; font-size:12px; color:#666;">
-              Questions? Reply to this email or contact us at support@${shop.replace(".myshopify.com", ".com")}
-            </div>
-          </div>`;
+    const currency = order.totalPriceSet.shopMoney.currencyCode;
+    const orderTotal = parseFloat(order.totalPriceSet.shopMoney.amount).toFixed(2);
 
-        await transporter.sendMail({
-          from: `"${shop.replace(".myshopify.com", "")}" <${process.env.SMTP_USER}>`,
-          to: customer.email,
-          subject: "Your order is ready – complete payment anytime!",
-          html,
-        });
+    const html = `... your email HTML ...`;
 
-        emailSent = true;
-      } catch (emailErr) {
-        console.error("Email failed:", emailErr.message);
-      }
-    }
+    await transporter.sendMail({
+      from: `"${shop.replace(".myshopify.com", "")}" <${process.env.SMTP_USER}>`,
+      to: customer.email,
+      subject: "Your order is ready – complete payment anytime!",
+      html,
+    });
+
+    emailSent = true;
+  } catch (emailErr) {
+    console.error("Email failed:", emailErr.message);
+  }
+}
 
     return await cors(
       request,
