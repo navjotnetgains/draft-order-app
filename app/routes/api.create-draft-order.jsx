@@ -214,6 +214,10 @@ export async function action({ request }) {
    // Send Email
 let emailSent = false;
 
+console.log("Email check - Customer email:", customer?.email);
+console.log("Email check - SMTP_USER exists:", !!process.env.SMTP_USER);
+console.log("Email check - SMTP_PASS exists:", !!process.env.SMTP_PASS);
+
 if (customer?.email && process.env.SMTP_USER && process.env.SMTP_PASS) {
   try {
     const transporter = nodemailer.createTransport({
@@ -225,6 +229,10 @@ if (customer?.email && process.env.SMTP_USER && process.env.SMTP_PASS) {
         pass: process.env.SMTP_PASS,
       },
     });
+
+    // Verify transporter connection
+    await transporter.verify();
+    console.log("SMTP connection verified successfully");
 
     const order = createdOrders[0];
     let itemsHtml = "";
@@ -250,22 +258,85 @@ if (customer?.email && process.env.SMTP_USER && process.env.SMTP_PASS) {
 
     const currency = order.totalPriceSet.shopMoney.currencyCode;
     const orderTotal = parseFloat(order.totalPriceSet.shopMoney.amount).toFixed(2);
+    const shopName = shop.replace(".myshopify.com", "");
 
-    const html = `... your email HTML ...`;
+    // ACTUAL EMAIL HTML - This was missing!
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin:0; padding:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background:#f5f5f5;">
+        <div style="max-width:600px; margin:0 auto; background:#fff; padding:32px;">
+          
+          <div style="text-align:center; margin-bottom:24px;">
+            <h1 style="margin:0; font-size:24px; color:#333;">Your Order is Ready!</h1>
+            <p style="color:#666; margin-top:8px;">Order ${order.name}</p>
+          </div>
+          
+          <p style="color:#333; line-height:1.6;">
+            Hi ${customer?.first_name || "there"},
+          </p>
+          
+          <p style="color:#333; line-height:1.6;">
+            Thank you for shopping with ${shopName}! Your draft order has been created and is ready for payment.
+          </p>
+          
+          <div style="background:#f9f9f9; border-radius:8px; padding:20px; margin:24px 0;">
+            <h3 style="margin:0 0 16px 0; font-size:16px; color:#333;">Order Summary</h3>
+            ${itemsHtml}
+            <div style="display:flex; justify-content:space-between; padding-top:16px; font-weight:700; font-size:18px;">
+              <span>Total</span>
+              <span>${currency} ${orderTotal}</span>
+            </div>
+          </div>
+          
+          <div style="text-align:center; margin:32px 0;">
+            <a href="${order.invoiceUrl}" style="display:inline-block; background:#000; color:#fff; padding:14px 32px; border-radius:6px; text-decoration:none; font-weight:600;">
+              Complete Payment
+            </a>
+          </div>
+          
+          <p style="color:#666; font-size:14px; line-height:1.6;">
+            If you have any questions about your order, please don't hesitate to contact us.
+          </p>
+          
+          <hr style="border:none; border-top:1px solid #eee; margin:24px 0;">
+          
+          <p style="color:#999; font-size:12px; text-align:center;">
+            © ${new Date().getFullYear()} ${shopName}. All rights reserved.
+          </p>
+          
+        </div>
+      </body>
+      </html>
+    `;
 
-    await transporter.sendMail({
-      from: `"${shop.replace(".myshopify.com", "")}" <${process.env.SMTP_USER}>`,
+    console.log("Sending email to:", customer.email);
+    
+    const mailResult = await transporter.sendMail({
+      from: `"${shopName}" <${process.env.SMTP_USER}>`,
       to: customer.email,
       subject: "Your order is ready – complete payment anytime!",
       html,
     });
 
+    console.log("Email sent successfully:", mailResult.messageId);
     emailSent = true;
+    
   } catch (emailErr) {
     console.error("Email failed:", emailErr.message);
+    console.error("Full email error:", emailErr);
   }
+} else {
+  console.log("Email skipped - missing requirements:", {
+    hasCustomerEmail: !!customer?.email,
+    hasSMTPUser: !!process.env.SMTP_USER,
+    hasSMTPPass: !!process.env.SMTP_PASS,
+  });
 }
-
     return await cors(
       request,
       json({ success: true, drafts: createdOrders, emailSent }),

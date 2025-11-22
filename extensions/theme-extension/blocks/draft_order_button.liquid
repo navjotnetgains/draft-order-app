@@ -1,4 +1,4 @@
-<!-- Custom Draft Order Button + Modal (Unique IDs & Classes) -->
+<!-- Custom Draft Order Button + Modal -->
 <script id="x-draft-data-hub" type="application/json">
 {
   "shop": {{ shop.permanent_domain | json }},
@@ -144,126 +144,165 @@
 
 <style>
   .x-error-text {color:#d32f2f;font-size:13px;margin-top:4px;}
-  #x-cart-draft-notif-btn {background-color:{{ block.settings.background_color | default: '#070707ff' }};color:{{ block.settings.text_color | default: '#ffffff' }};padding:12px;border:none;font-size:16px;cursor:pointer;width:100%;margin-top:15px;}
   .x-draft-main-btn {display:block;width:100%;text-align:center;padding:14px;font-size:14px;font-weight:200;border:none;cursor:pointer;transition:all .2s ease;}
-  .x-draft-main-btn.drawer-mode {background:#1d1d1dff !important;color:#fff !important;border-radius:14px !important;margin:10px 0 !important;padding:15px !important;font-weight:600 !important;}
-  .x-draft-main-btn.notification-mode {background:#4f5051;color:#fff;margin-bottom:15px;}
-  .x-draft-main-btn.notification-mode:hover {transform:translateY(-3px);background:#6b6b6b;}
   @keyframes x-spin {from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 </style>
 
 <script>
 (function(){
   const draftData = JSON.parse(document.getElementById('x-draft-data-hub').textContent);
+  
   let toastHolder = document.createElement('div');
   toastHolder.id = 'x-toast-holder';
   toastHolder.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:1000000;display:flex;flex-direction:column;gap:10px;max-width:300px;width:100%;pointer-events:none;align-items:center;';
   document.body.appendChild(toastHolder);
 
-  function showToast(msg,dur=7000){
-    const t=document.createElement('div');
-    t.style.cssText='background:rgba(0,0,0,0.8);color:white;padding:12px 20px;border-radius:6px;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.3);opacity:0;transition:opacity .3s;pointer-events:auto;';
-    t.textContent=msg;
+  function showToast(msg, dur = 7000) {
+    const t = document.createElement('div');
+    t.style.cssText = 'background:rgba(0,0,0,0.8);color:white;padding:12px 20px;border-radius:6px;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.3);opacity:0;transition:opacity .3s;pointer-events:auto;';
+    t.textContent = msg;
     toastHolder.appendChild(t);
-    requestAnimationFrame(()=>{t.style.opacity='1';});
-    setTimeout(()=>{t.style.opacity='0';t.addEventListener('transitionend',()=>t.remove());},dur);
+    requestAnimationFrame(() => { t.style.opacity = '1'; });
+    setTimeout(() => { t.style.opacity = '0'; t.addEventListener('transitionend', () => t.remove()); }, dur);
   }
 
-  async function loadCountries(countryId,stateId){
-    const countrySel=document.getElementById(countryId);
-    const stateSel=document.getElementById(stateId);
-    try{
-      const res=await fetch('https://countriesnow.space/api/v0.1/countries/states');
-      const {data}=await res.json();
-      data.forEach(c=>{countrySel.add(new Option(c.name,c.name));});
-      countrySel.addEventListener('change',()=>{
-        const sel=data.find(x=>x.name===countrySel.value);
-        stateSel.innerHTML='<option value="">Select state</option>';
-        sel?.states.forEach(s=>stateSel.add(new Option(s.name,s.name)));
+  async function loadCountries(countryId, stateId) {
+    const countrySel = document.getElementById(countryId);
+    const stateSel = document.getElementById(stateId);
+    try {
+      const res = await fetch('https://countriesnow.space/api/v0.1/countries/states');
+      const { data } = await res.json();
+      data.forEach(c => { countrySel.add(new Option(c.name, c.name)); });
+      countrySel.addEventListener('change', () => {
+        const sel = data.find(x => x.name === countrySel.value);
+        stateSel.innerHTML = '<option value="">Select state</option>';
+        sel?.states.forEach(s => stateSel.add(new Option(s.name, s.name)));
       });
-    }catch(e){console.log('Country fetch error',e);}
+    } catch (e) { console.log('Country fetch error', e); }
   }
 
-  let cartCache=null;
-  function getCart(){return fetch('/cart.js').then(r=>r.json()).then(c=>{cartCache=c;return c;});}
+  // Improved cart fetching with rate limit protection
+  let cartCache = null;
+  let lastCartFetch = 0;
+  const CART_FETCH_COOLDOWN = 2000;
+  let cartFetchPromise = null;
 
-  function clearErrors(fields){
-    fields.forEach(f=>{const e=document.getElementById('x-err-'+f.id.split('-').pop());if(e)e.textContent='';});
+  async function getCart() {
+    const now = Date.now();
+    
+    if (cartCache && (now - lastCartFetch) < CART_FETCH_COOLDOWN) {
+      return cartCache;
+    }
+    
+    if (cartFetchPromise) {
+      return cartFetchPromise;
+    }
+    
+    cartFetchPromise = (async () => {
+      try {
+        const res = await fetch('/cart.js');
+        
+        if (!res.ok) {
+          console.warn('Cart fetch failed with status:', res.status);
+          return cartCache || { items: [] };
+        }
+        
+        const text = await res.text();
+        
+        if (text.trim().startsWith('<')) {
+          console.warn('HTML returned instead of JSON (likely rate limit)');
+          return cartCache || { items: [] };
+        }
+        
+        const cart = JSON.parse(text);
+        cartCache = cart;
+        lastCartFetch = Date.now();
+        return cart;
+        
+      } catch (err) {
+        console.error('Cart fetch error', err);
+        return cartCache || { items: [] };
+      } finally {
+        cartFetchPromise = null;
+      }
+    })();
+    
+    return cartFetchPromise;
   }
 
-  function initXDraft(){
-    const modal=document.getElementById('x-modal-container');
-    const closeBtn=document.getElementById('x-close-modal-btn');
-    const submitBtn=document.getElementById('x-submit-draft-btn');
-    const submitTxt=document.getElementById('x-submit-text');
-    const spinner=document.getElementById('x-submit-spinner');
+  function clearErrors(fields) {
+    fields.forEach(f => {
+      const e = document.getElementById('x-err-' + f.id.split('-').pop());
+      if (e) e.textContent = '';
+    });
+  }
 
-    async function openModal(e){
+  function initXDraft() {
+    const modal = document.getElementById('x-modal-container');
+    const closeBtn = document.getElementById('x-close-modal-btn');
+    const submitBtn = document.getElementById('x-submit-draft-btn');
+    const submitTxt = document.getElementById('x-submit-text');
+    const spinner = document.getElementById('x-submit-spinner');
+
+    async function openModal(e) {
       e.preventDefault();
-      if(!draftData.customer?.email){showToast("Please log in as a customer.");return;}
-      if(cartCache?.items.length===0){await getCart();}
-      if(cartCache?.items.length===0){showToast("Your cart is empty.");return;}
-      modal.style.display='flex';
+      if (!draftData.customer?.email) { showToast("Please log in as a customer."); return; }
+      const cart = await getCart();
+      if (cart.items.length === 0) { showToast("Your cart is empty."); return; }
+      modal.style.display = 'flex';
     }
 
-    // Main button (add this ID to your button in theme)
-    document.querySelectorAll('#create-x-draft-order, .create-x-draft-order').forEach(b=>b.addEventListener('click',openModal));
+    document.querySelectorAll('#create-x-draft-order, .create-x-draft-order').forEach(b => b.addEventListener('click', openModal));
 
-    function addCartNotificationBtn(){
-      getCart().then(cart=>{
-        document.querySelectorAll('.cart-notification, #cart-notification, .cart-drawer, #CartDrawer').forEach(container=>{
-          const existing=container.querySelector('#x-cart-draft-notif-btn');
-          if(cart.items.length===0){existing?.remove();return;}
-          if(existing) return;
-          const btn=document.createElement('button');
-          btn.id='x-cart-draft-notif-btn';
-          btn.textContent='{{ block.settings.text | default: "Create Draft Order" }}';
-          btn.className = container.classList.contains('cart-drawer')||container.id==='CartDrawer' ? 'x-draft-main-btn drawer-mode' : 'x-draft-main-btn notification-mode';
-          btn.addEventListener('click',openModal);
-          const checkout=container.querySelector('[href="/checkout"], button[name="checkout"]');
-          checkout ? checkout.before(btn) : container.appendChild(btn);
-        });
-      });
-    }
-
-    document.addEventListener('DOMContentLoaded',()=>{
+    document.addEventListener('DOMContentLoaded', () => {
       document.body.appendChild(modal);
-      loadCountries('x-ship-country','x-ship-state');
-      loadCountries('x-bill-country','x-bill-state');
-      document.getElementById('x-same-billing-chk').addEventListener('change',e=>{
+      loadCountries('x-ship-country', 'x-ship-state');
+      loadCountries('x-bill-country', 'x-bill-state');
+      document.getElementById('x-same-billing-chk').addEventListener('change', e => {
         document.getElementById('x-billing-section').style.display = e.target.checked ? 'none' : 'block';
       });
-      addCartNotificationBtn();
     });
 
-    new MutationObserver(addCartNotificationBtn).observe(document.body,{childList:true,subtree:true});
-    document.addEventListener('cart:updated',addCartNotificationBtn);
+    closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
 
-    closeBtn.addEventListener('click',()=>{modal.style.display='none';});
-
-    submitBtn.addEventListener('click',async()=>{
+    submitBtn.addEventListener('click', async () => {
       const shop = draftData.shop;
       const required = [
-        {id:'x-ship-country',name:'Country'},{id:'x-ship-addr1',name:'Address'},{id:'x-ship-city',name:'City'},
-        {id:'x-ship-state',name:'State'},{id:'x-ship-pin',name:'PIN code'}
+        { id: 'x-ship-country', name: 'Country' },
+        { id: 'x-ship-addr1', name: 'Address' },
+        { id: 'x-ship-city', name: 'City' },
+        { id: 'x-ship-state', name: 'State' },
+        { id: 'x-ship-pin', name: 'PIN code' }
       ];
-      if(!document.getElementById('x-same-billing-chk').checked){
+      
+      if (!document.getElementById('x-same-billing-chk').checked) {
         required.push(
-          {id:'x-bill-country',name:'Billing Country'},{id:'x-bill-addr1',name:'Billing Address'},
-          {id:'x-bill-city',name:'Billing City'},{id:'x-bill-state',name:'Billing State'},{id:'x-bill-pin',name:'Billing PIN'}
+          { id: 'x-bill-country', name: 'Billing Country' },
+          { id: 'x-bill-addr1', name: 'Billing Address' },
+          { id: 'x-bill-city', name: 'Billing City' },
+          { id: 'x-bill-state', name: 'Billing State' },
+          { id: 'x-bill-pin', name: 'Billing PIN' }
         );
       }
+      
       clearErrors(required);
-      for(const f of required){
-        const el=document.getElementById(f.id);
-        if(!el?.value.trim()){
-          document.getElementById('x-err-'+f.id.split('-').pop())?.focus();
-          document.getElementById('x-err-'+f.id.split('-').pop()).textContent = f.name+' is required';
+      
+      for (const f of required) {
+        const el = document.getElementById(f.id);
+        if (!el?.value.trim()) {
+          const errEl = document.getElementById('x-err-' + f.id.split('-').pop());
+          if (errEl) {
+            errEl.textContent = f.name + ' is required';
+            el?.focus();
+          }
           return;
         }
       }
 
-      submitBtn.disabled=true; submitTxt.style.display='none'; spinner.style.display='inline-block'; spinner.style.animation='x-spin 1s linear infinite';
+      submitBtn.disabled = true;
+      submitTxt.style.display = 'none';
+      spinner.style.display = 'inline-block';
+      spinner.style.animation = 'x-spin 1s linear infinite';
 
       const shipping = {
         address1: document.getElementById('x-ship-addr1').value,
@@ -274,6 +313,7 @@
         company: document.getElementById('x-ship-company').value || '',
         country: document.getElementById('x-ship-country').value
       };
+      
       const billing = document.getElementById('x-same-billing-chk').checked ? shipping : {
         address1: document.getElementById('x-bill-addr1').value,
         apartment: document.getElementById('x-bill-apt').value || '',
@@ -285,21 +325,40 @@
       };
 
       const cart = await getCart();
-      try{
-        const res = await fetch('https://draft-order-app-seven.vercel.app/api/create-draft-order',{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({customer:draftData.customer,cart,address:shipping,billingAddress:billing,discount:cart.discount_codes?.[0]||null,shop,useShipping:document.getElementById('x-same-billing-chk').checked})
+      
+      try {
+        const res = await fetch('https://draft-order-app-seven.vercel.app/api/create-draft-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer: draftData.customer,
+            cart,
+            address: shipping,
+            billingAddress: billing,
+            discount: cart.discount_codes?.[0] || null,
+            shop,
+            useShipping: document.getElementById('x-same-billing-chk').checked
+          })
         });
+        
         const json = await res.json();
-        if(json.success){
-          await fetch('/cart/clear.js',{method:'POST'});
+        
+        if (json.success) {
+          await fetch('/cart/clear.js', { method: 'POST' });
           showToast("Draft order created successfully!");
-          setTimeout(()=>location.reload(),1500);
-        }else showToast("Error: "+json.error);
-      }catch(err){showToast("Network error. Try again.");console.error(err);}
-      finally{
-        submitBtn.disabled=false; submitTxt.style.display='inline'; spinner.style.display='none'; spinner.style.animation='';
-        modal.style.display='none';
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          showToast("Error: " + json.error);
+        }
+      } catch (err) {
+        showToast("Network error. Try again.");
+        console.error(err);
+      } finally {
+        submitBtn.disabled = false;
+        submitTxt.style.display = 'inline';
+        spinner.style.display = 'none';
+        spinner.style.animation = '';
+        modal.style.display = 'none';
       }
     });
   }
@@ -307,7 +366,6 @@
   initXDraft();
 })();
 </script>
-
 
 {% schema %}
 {
